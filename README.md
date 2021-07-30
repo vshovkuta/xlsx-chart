@@ -203,6 +203,7 @@ xlsxChart.generate (opts, function (err, data) {
 var opts = {
 	file: "chart.xlsx", // exported file
 	type: "nodebuffer", // optional: used by JSZip library
+	dataPerSheet: false, // optional: creates spreadsheet for each chart data and names it same as chartTitle
 	charts: [
 		{
 			chart: "column", // pie, doughnut, line, area, bar
