@@ -147,6 +147,178 @@ var Chart = Backbone.Model.extend ({
 			cb ();
 		});
 	},
+
+	writeSeparateTable: function (chart, sheetNumber, cb) {
+		let me = this;
+
+		let sheetFileName;
+		let sheetRelName;
+
+		async.series ([
+			function (cb) {
+				me.read ({file: "[Content_Types].xml"}, function (err, o) {
+					if (err) {
+						return cb (err);
+					}
+
+					const countOfExistingSheets = o ["Types"]["Override"]
+						.filter (({$: {ContentType}}) => ContentType === "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml").length;
+
+					sheetFileName = `sheet${sheetNumber}.xml`;
+
+					if (sheetNumber <= countOfExistingSheets) {
+						return cb ();
+					}
+
+					o ["Types"]["Override"].push ({
+						$: {
+							PartName: `/xl/worksheets/${sheetFileName}`,
+							ContentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"
+						},
+					});
+		
+					me.write ({file: "[Content_Types].xml", object: o});
+					cb ();
+
+				});
+			},
+			function (cb) {
+				me.read ({file: "xl/_rels/workbook.xml.rels"}, function (err, o) {
+					if (err) {
+						return cb (err);
+					}
+
+					const existingRelForThisSheet = o ["Relationships"]["Relationship"]
+						.find (({$: {Target}}) => Target === `worksheets/${sheetFileName}`);
+
+					if (existingRelForThisSheet) {
+						sheetRelName = existingRelForThisSheet.$.Id;
+						return cb ();
+					}
+
+					const countOfExistingRels = o ["Relationships"]["Relationship"].length;
+
+					sheetRelName = `rId${countOfExistingRels + 1}`;
+
+					o ["Relationships"]["Relationship"].push ({
+						$: {
+							Id: sheetRelName,
+							Target: `worksheets/${sheetFileName}`,
+							Type: "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"
+						},
+					});
+		
+					me.write ({file: "xl/_rels/workbook.xml.rels", object: o});
+					cb ();
+				});
+			},
+			function (cb) {
+				me.read ({file: "xl/workbook.xml"}, function (err, o) {
+					if (err) {
+						return cb (err);
+					}
+
+					const existingSheet = o ["workbook"]["sheets"]["sheet"]
+						.find (({$: {sheetId}}) => sheetId === `${sheetNumber}`);
+
+					if (existingSheet) {
+						existingSheet.$.name = chart.chartTitle;
+					} else {
+						o ["workbook"]["sheets"]["sheet"].push ({
+							$: {
+								name: chart.chartTitle,
+								sheetId: sheetNumber,
+								"r:id": sheetRelName,
+							},
+						});
+					}
+
+		
+					me.write ({file: "xl/workbook.xml", object: o});
+					cb ();
+				});
+			},
+			function (cb) {
+				let rows = [{
+					$: {
+						r: 1,
+						spans: "1:2"
+					},
+					c: {
+						$: {
+							r: "A1",
+							t: "s"
+						},
+						v: me.getStr (chart.chartTitle)
+					}
+				}, {
+					$: {
+						r: 2,
+						spans: "1:" + (chart.titles.length + 1)
+					},
+					c: _.map (chart.titles, function (t, x) {
+						return {
+							$: {
+								r: `${me.getColName (x + 2)}2`,
+								t: "s"
+							},
+							v: me.getStr (t)
+						}
+					})
+				}];
+				_.each (chart.fields, function (f, y) {
+					let r = {
+						$: {
+							r: y + 3,
+							spans: "1:" + (chart.titles.length + 1)
+						}
+					};
+					let c = [{
+						$: {
+							r: "A" + (y + 3),
+							t: "s"
+						},
+						v: me.getStr (f)
+					}];
+					_.each (chart.titles, function (t, x) {
+						c.push ({
+							$: {
+								r: me.getColName (x + 2) + (y + 3)
+							},
+							v: chart.data[t][f]
+						});
+					});
+					r.c = c;
+					rows.push (r);
+				});
+
+				const o = {
+					worksheet: {
+						$: {
+							xmlns: "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+							"xmlns:r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+						},
+						dimension: {
+							$: {
+								ref: `A1:${me.getColName (chart.titles.length + 1)}${chart.fields.length + 1}`,
+							},
+						},
+						sheetData: {
+							row: rows,
+						},
+					},
+				};
+
+				me.write ({file: `xl/worksheets/${sheetFileName}`, object: o});
+				cb ();
+			}
+		], (err) => {
+			if (err) {
+				return cb (new VError (err, "build"));
+			}
+			cb (null);
+		})
+	},
 	/*
 		Write mult table
 	*/
@@ -465,6 +637,12 @@ var Chart = Backbone.Model.extend ({
 				};
 				var customColorsSeries = {};
 
+				let dataSheetName = "Table";
+
+				if (me.dataPerSheet) {
+					dataSheetName = chartOpts.chartTitle;
+				}
+
 				if (chartOpts.customColors) {
 					const customColors = chartOpts.customColors;
 
@@ -575,7 +753,7 @@ var Chart = Backbone.Model.extend ({
 					},
 					"c:tx": {
 						"c:strRef": {
-							"c:f": "Table!$" + me.getColName (i + 2) + "$" + row,
+							"c:f": dataSheetName + "!$" + me.getColName (i + 2) + "$" + row,
 							"c:strCache": {
 								"c:ptCount": {
 									$: {
@@ -595,7 +773,7 @@ var Chart = Backbone.Model.extend ({
 					...customColorsSeries,
 					"c:cat": {
 						"c:strRef": {
-							"c:f": "Table!$A$" + (row + 1) + ":$A$" + (me.fields.length + row),
+							"c:f": dataSheetName + "!$A$" + (row + 1) + ":$A$" + (me.fields.length + row),
 							"c:strCache": {
 								"c:ptCount": {
 									$: {
@@ -615,7 +793,7 @@ var Chart = Backbone.Model.extend ({
 					},
 					"c:val": {
 						"c:numRef": {
-							"c:f": "Table!$" + me.getColName (i + 2) + "$" + (row + 1) + ":$" + me.getColName (i + 2) + "$" + (me.fields.length + row),
+							"c:f": dataSheetName + "!$" + me.getColName (i + 2) + "$" + (row + 1) + ":$" + me.getColName (i + 2) + "$" + (me.fields.length + row),
 							"c:numCache": {
 								"c:formatCode": "General",
 								"c:ptCount": {
@@ -1035,10 +1213,17 @@ var Chart = Backbone.Model.extend ({
 							me.data[t][f] = value;
 						});
 					});
-					me.writeMultTable (row, () => {
-						row += 3 + me.fields.length;
-						cb ();
-					});
+					if (me.dataPerSheet) {
+						me.writeSeparateTable (chart, me.charts.indexOf (chart) + 2, () => {
+							// row += 3 + me.fields.length;
+							cb ();
+						});
+					} else {
+						me.writeMultTable (row, () => {
+							row += 3 + me.fields.length;
+							cb ();
+						});
+					}
 				}, cb)
 			},
 			function (cb) {
