@@ -639,7 +639,7 @@ var Chart = Backbone.Model.extend ({
 
 				let dataSheetName = "Table";
 
-				if (me.dataPerSheet && me.charts.length > 1) {
+				if (me.dataPerSheet) {
 					dataSheetName = chartOpts.chartTitle;
 				}
 
