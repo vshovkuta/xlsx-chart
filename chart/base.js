@@ -639,7 +639,7 @@ var Chart = Backbone.Model.extend ({
 
 				let dataSheetName = "Table";
 
-				if (me.dataPerSheet) {
+				if (me.dataPerSheet && me.charts.length > 1) {
 					dataSheetName = chartOpts.chartTitle;
 				}
 
@@ -753,7 +753,7 @@ var Chart = Backbone.Model.extend ({
 					},
 					"c:tx": {
 						"c:strRef": {
-							"c:f": dataSheetName + "!$" + me.getColName (i + 2) + "$" + row,
+							"c:f": "'" + dataSheetName + "'!$" + me.getColName (i + 2) + "$" + row,
 							"c:strCache": {
 								"c:ptCount": {
 									$: {
@@ -773,7 +773,7 @@ var Chart = Backbone.Model.extend ({
 					...customColorsSeries,
 					"c:cat": {
 						"c:strRef": {
-							"c:f": dataSheetName + "!$A$" + (row + 1) + ":$A$" + (me.fields.length + row),
+							"c:f": "'" + dataSheetName + "'!$A$" + (row + 1) + ":$A$" + (me.fields.length + row),
 							"c:strCache": {
 								"c:ptCount": {
 									$: {
@@ -793,7 +793,7 @@ var Chart = Backbone.Model.extend ({
 					},
 					"c:val": {
 						"c:numRef": {
-							"c:f": dataSheetName + "!$" + me.getColName (i + 2) + "$" + (row + 1) + ":$" + me.getColName (i + 2) + "$" + (me.fields.length + row),
+							"c:f": "'" + dataSheetName + "'!$" + me.getColName (i + 2) + "$" + (row + 1) + ":$" + me.getColName (i + 2) + "$" + (me.fields.length + row),
 							"c:numCache": {
 								"c:formatCode": "General",
 								"c:ptCount": {
@@ -859,7 +859,7 @@ var Chart = Backbone.Model.extend ({
 							val: chart.substr (0, 3),
 						},
 					};
-					
+
 				} else if (chart == "line" || chart == "area" || chart == "radar" || chart == "scatter") {
 					newChart = _.clone (me.chartTemplate ["c:chartSpace"]["c:chart"]["c:plotArea"][templateChartName]);
 					delete newChart["c:barDir"];
@@ -869,7 +869,7 @@ var Chart = Backbone.Model.extend ({
 							val: 1,
 						},
 					};
-					
+
 					newChart["c:ser"] = ser;
 					if (chartOpts.firstSliceAng) {
 						newChart["c:firstSliceAng"] = {
@@ -1170,7 +1170,7 @@ var Chart = Backbone.Model.extend ({
 		_.extend (me, opts);
 
 		me.setTemplateName (opts);
-		
+
 		async.series ([
 			function (cb) {
 				me.zip = new JSZip ();
@@ -1231,6 +1231,10 @@ var Chart = Backbone.Model.extend ({
 				let row = 2;
 
 				async.eachSeries (me.charts, (chart, cb) => {
+					if (me.dataPerSheet) {
+						row = 2;
+					}
+
 					["chart", "titles", "fields", "data", "chartTitle"].forEach (a => me[a] = chart[a]);
 
 					const position = Object.assign ({
