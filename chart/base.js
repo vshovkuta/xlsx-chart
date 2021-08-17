@@ -413,6 +413,10 @@ var Chart = Backbone.Model.extend ({
 			_.each (me.fields, function (t) {
 				si.push ({t: t});
 			});
+
+			if (me.chartTitle) {
+				si.push ({t: me.chartTitle});
+			}
 			me.str = {};
 
 			_.each (si, function (o, i) {
@@ -1150,10 +1154,21 @@ var Chart = Backbone.Model.extend ({
 						me.data[t][f] = value;
 					});
 				});
-				me.writeTable (cb);
+				if (me.dataPerSheet) {
+					me.writeSeparateTable (me.charts[0], 2, () => {
+						// row += 3 + me.fields.length;
+						cb ();
+					});
+				} else {
+					me.writeTable (cb);
+				}
 			},
 			function (cb) {
-				me.writeChart (1, 1, cb);
+				if (me.dataPerSheet) {
+					me.writeChart (1, 2, cb);
+				} else {
+					me.writeChart (1, 1, cb);
+				}
 			}
 		], function (err) {
 			if (err) {
