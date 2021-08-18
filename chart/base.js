@@ -767,29 +767,42 @@ var Chart = Backbone.Model.extend ({
 
 				o ["c:chartSpace"]["c:chart"]["c:plotArea"][chartTagName].push (newChart);
 
-				if (chartOpts.axes) {
-
-					if (chartOpts.axes.left) {
-						o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"]["c:axPos"] = {
-							$: {
-								val: 'l',
-							},
-						};
-
-						o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"]["c:scaling"]["c:min"] = {
-							$: {
-								val: chartOpts.axes.left.min,
-							},
-						};
-
-						o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"]["c:scaling"]["c:max"] = {
-							$: {
-								val: chartOpts.axes.left.max,
-							},
-						};
+				if (chartOpts.yAxes) {
+					if (!me.defaultValAxis) {
+						me.defaultValAxis = _.clone (o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"]);
 					}
 
+					o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"] = [];
+
+					_.each(chartOpts.yAxes, function (axis, i) {
+						const currentValAxis = _.clone (me.defaultValAxis)
+
+						currentValAxis["c:axId"].$.val = currentValAxis["c:axId"].$.val + 1 + i;
+
+						currentValAxis["c:axPos"] = {
+							$: {
+								val: axis.pos,
+							},
+						};
+
+						currentValAxis["c:scaling"]["c:min"] = {
+							$: {
+								val: axis.min,
+							},
+						};
+
+						currentValAxis["c:scaling"]["c:max"] = {
+							$: {
+								val: axis.max,
+							},
+						};
+
+						o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"].push(currentValAxis);
+					});
+				} else {
+					console.log('smth went wrong');
 				}
+
 
 				if (chartOpts.legendPos === undefined || chartOpts.legendPos) {
 					o ["c:chartSpace"]["c:chart"]["c:legend"] = {
