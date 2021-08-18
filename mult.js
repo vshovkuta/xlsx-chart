@@ -4,6 +4,12 @@ let xlsxChart = new XLSXChart ();
 let opts = {
 	charts: [{
 		chart: "column",
+		axes: {
+			left: {
+				min: 0,
+				max: 50,
+			},
+		},
 		titles: [
 			"Title 1",
 			"Title 2",
