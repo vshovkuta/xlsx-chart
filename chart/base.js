@@ -768,6 +768,7 @@ var Chart = Backbone.Model.extend ({
 				}
 
 				if (yAxis === 'r') {
+					me.hasRightAxis = true;
 					newChart = JSON.parse(JSON.stringify(newChart));
 					_.each(newChart["c:axId"], function (item) {
 						item.$.val = +item.$.val + yAxisIdShift;
@@ -825,97 +826,108 @@ var Chart = Backbone.Model.extend ({
 				}
 			});
 
-			if (chartOpts.yAxes) {
+			if (me.hasRightAxis) {
 				const leftValAxis = Object.assign ({}, o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"]);
 				o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"] = [];
+				o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"].push(leftValAxis);
 
-				if (chartOpts.yAxes?.left) {
-					leftValAxis["c:axPos"] = {
-						$: {
-							val: "l",
-						},
-					};
+				const rightValAxis = Object.assign ({}, leftValAxis);
+				rightValAxis["c:scaling"] = Object.assign ({}, leftValAxis["c:scaling"]);
+
+				rightValAxis["c:axId"] = {
+					$: {
+						val: +rightValAxis["c:axId"].$.val + yAxisIdShift,
+					},
+				};
+
+				rightValAxis["c:axPos"] = {
+					$: {
+						val: "r",
+					},
+				};
+
+				const leftCatAxis = Object.assign ({}, o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:catAx"]);
+				o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:catAx"] = [];
+				o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:catAx"].push(leftCatAxis);
+
+				const rightCatAxis = Object.assign ({}, leftCatAxis);
+				rightCatAxis["c:axId"] = {
+					$: {
+						val: +rightCatAxis["c:axId"].$.val + yAxisIdShift,
+					},
+				};
+
+				rightCatAxis["c:crossAx"] = {
+					$: {
+						val: +rightValAxis["c:axId"].$.val,
+					},
+				};
+
+				rightCatAxis["c:delete"] = {
+					$: {
+						val: "1",
+					},
+				};
+
+				rightValAxis["c:crossAx"] = {
+					$: {
+						val: +rightCatAxis["c:axId"].$.val,
+					},
+				};
+
+				rightValAxis["c:crosses"] = {
+					$: {
+						val: "max",
+					}
+				}
+
+				o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:catAx"].push(rightCatAxis);
+				o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"].push(rightValAxis);
+			}
+
+			if (chartOpts.yAxes) {
+				if (chartOpts.yAxes.left) {
+					let leftValAxis;
+
+					if (!me.hasRightAxis) {
+						leftValAxis = o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"];
+					} else {
+						leftValAxis = o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"].find((valAx) => valAx["c:axPos"].$.val === 'l');
+					}
+
 
 					leftValAxis["c:scaling"]["c:min"] = {
 						$: {
-							val: chartOpts.yAxes?.left.min,
+							val: chartOpts.yAxes.left.min,
 						},
 					};
 
 					leftValAxis["c:scaling"]["c:max"] = {
 						$: {
-							val: chartOpts.yAxes?.left.max,
+							val: chartOpts.yAxes.left.max,
 						},
 					};
-
-					o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"].push(leftValAxis);
 				}
 
-				if (chartOpts.yAxes?.right) {
-					const rightValAxis = Object.assign ({}, leftValAxis);
-					rightValAxis["c:scaling"] = Object.assign ({}, leftValAxis["c:scaling"]);
+				if (chartOpts.yAxes.right && me.hasRightAxis) {
+					let rightValAxis;
 
-					rightValAxis["c:axId"] = {
-						$: {
-							val: +rightValAxis["c:axId"].$.val + yAxisIdShift,
-						},
-					};
-
-					rightValAxis["c:axPos"] = {
-						$: {
-							val: "r",
-						},
-					};
-
+					if (!me.hasRightAxis) {
+						rightValAxis = o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"];
+					} else {
+						rightValAxis = o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"].find((valAx) => valAx["c:axPos"].$.val === 'r');
+					}
 					rightValAxis["c:scaling"]["c:min"] = {
 						$: {
-							val: chartOpts.yAxes?.right.min,
+							val: chartOpts.yAxes.right.min,
 						},
 					};
 
 					rightValAxis["c:scaling"]["c:max"] = {
 						$: {
-							val: chartOpts.yAxes?.right.max,
+							val: chartOpts.yAxes.right.max,
 						},
 					};
-
-					const leftCatAxis = Object.assign ({}, o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:catAx"]);
-					o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:catAx"] = [];
-					o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:catAx"].push(leftCatAxis);
-
-					const rightCatAxis = Object.assign ({}, leftCatAxis);
-					rightCatAxis["c:axId"] = {
-						$: {
-							val: +rightCatAxis["c:axId"].$.val + yAxisIdShift,
-						},
-					};
-
-					rightCatAxis["c:crossAx"] = {
-						$: {
-							val: +rightValAxis["c:axId"].$.val,
-						},
-					};
-
-					rightCatAxis["c:delete"] = {
-						$: {
-							val: "1",
-						},
-					};
-
-					rightValAxis["c:crossAx"] = {
-						$: {
-							val: +rightCatAxis["c:axId"].$.val,
-						},
-					};
-
-					rightValAxis["c:crosses"] = {
-						$: {
-							val: "max",
-						}
-					}
-
-					o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:catAx"].push(rightCatAxis);
-					o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"].push(rightValAxis);
 				}
 			}
 
