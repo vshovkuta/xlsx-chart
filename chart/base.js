@@ -455,10 +455,12 @@ var Chart = Backbone.Model.extend ({
 				return cb (new VError (err, "writeChart"));
 			}
 			var seriesByChart = {};
+			var yAxisIdShift = 1000;
 			const chartOpts = me.charts[chartN - 1];
 			_.each (me.titles, function (t, i) {
 				var chart = me.data[t].chart || me.chart;
 				var grouping = me.data[t].grouping || me.grouping || CHART_GROUPING_BY_CHART_NAME[chart];
+				var yAxis = me.data[t].yAxis || 'l';
 
 				var customColorsPoints = {
 					"c:dPt": [],
@@ -649,7 +651,7 @@ var Chart = Backbone.Model.extend ({
 						}
 					};
 				};
-				const seriesKey = `${chart}\r\r${grouping}`;
+				const seriesKey = `${chart}\r\r${grouping}\r\r${yAxis}`;
 				seriesByChart[seriesKey] = seriesByChart[seriesKey] || [];
 				seriesByChart[seriesKey].push (ser);
 			});
@@ -661,7 +663,7 @@ var Chart = Backbone.Model.extend ({
 
 			_.each (seriesByChart, function (ser, chart) {
 
-				var [chart, grouping] = chart.split ("\r\r");
+				var [chart, grouping, yAxis] = chart.split ("\r\r");
 
 				const chartTagName = CHART_TAG_BY_CHART_NAME[chart];
 
@@ -765,29 +767,14 @@ var Chart = Backbone.Model.extend ({
 					}
 				}
 
-				o ["c:chartSpace"]["c:chart"]["c:plotArea"][chartTagName].push (newChart);
-
-				if (chartOpts.yAxes) {
-					if (chartOpts.yAxes.left) {
-						o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"]["c:axPos"] = {
-							$: {
-								val: chartOpts.yAxes.left.pos,
-							},
-						};
-
-						o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"]["c:scaling"]["c:min"] = {
-							$: {
-								val: chartOpts.yAxes.left.min,
-							},
-						};
-
-						o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"]["c:scaling"]["c:max"] = {
-							$: {
-								val: chartOpts.yAxes.left.max,
-							},
-						};
-					}
+				if (yAxis === 'r') {
+					newChart = JSON.parse(JSON.stringify(newChart));
+					_.each(newChart["c:axId"], function (item) {
+						item.$.val = +item.$.val + yAxisIdShift;
+					});
 				}
+
+				o ["c:chartSpace"]["c:chart"]["c:plotArea"][chartTagName].push (newChart);
 
 				if (chartOpts.legendPos === undefined || chartOpts.legendPos) {
 					o ["c:chartSpace"]["c:chart"]["c:legend"] = {
@@ -837,6 +824,101 @@ var Chart = Backbone.Model.extend ({
 					};
 				}
 			});
+
+			if (chartOpts.yAxes) {
+				const leftValAxis = Object.assign ({}, o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"]);
+				o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"] = [];
+
+				if (chartOpts.yAxes?.left) {
+					leftValAxis["c:axPos"] = {
+						$: {
+							val: "l",
+						},
+					};
+
+					leftValAxis["c:scaling"]["c:min"] = {
+						$: {
+							val: chartOpts.yAxes?.left.min,
+						},
+					};
+
+					leftValAxis["c:scaling"]["c:max"] = {
+						$: {
+							val: chartOpts.yAxes?.left.max,
+						},
+					};
+
+					o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"].push(leftValAxis);
+				}
+
+				if (chartOpts.yAxes?.right) {
+					const rightValAxis = Object.assign ({}, leftValAxis);
+					rightValAxis["c:scaling"] = Object.assign ({}, leftValAxis["c:scaling"]);
+
+					rightValAxis["c:axId"] = {
+						$: {
+							val: +rightValAxis["c:axId"].$.val + yAxisIdShift,
+						},
+					};
+
+					rightValAxis["c:axPos"] = {
+						$: {
+							val: "r",
+						},
+					};
+
+					rightValAxis["c:scaling"]["c:min"] = {
+						$: {
+							val: chartOpts.yAxes?.right.min,
+						},
+					};
+
+					rightValAxis["c:scaling"]["c:max"] = {
+						$: {
+							val: chartOpts.yAxes?.right.max,
+						},
+					};
+
+					const leftCatAxis = Object.assign ({}, o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:catAx"]);
+					o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:catAx"] = [];
+					o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:catAx"].push(leftCatAxis);
+
+					const rightCatAxis = Object.assign ({}, leftCatAxis);
+					rightCatAxis["c:axId"] = {
+						$: {
+							val: +rightCatAxis["c:axId"].$.val + yAxisIdShift,
+						},
+					};
+
+					rightCatAxis["c:crossAx"] = {
+						$: {
+							val: +rightValAxis["c:axId"].$.val,
+						},
+					};
+
+					rightCatAxis["c:delete"] = {
+						$: {
+							val: "1",
+						},
+					};
+
+					rightValAxis["c:crossAx"] = {
+						$: {
+							val: +rightCatAxis["c:axId"].$.val,
+						},
+					};
+
+					rightValAxis["c:crosses"] = {
+						$: {
+							val: "max",
+						}
+					}
+
+					o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:catAx"].push(rightCatAxis);
+					o ["c:chartSpace"]["c:chart"]["c:plotArea"]["c:valAx"].push(rightValAxis);
+				}
+			}
+
 			me.removeUnusedCharts (o);
 
 			if (me.chartTitle) {
